@@ -9,33 +9,6 @@
 
 var exports = {};
 
-exports.inspect = inspect;
-function inspect(buffer) {
-  if (buffer === undefined) return "undefined";
-  var view;
-  var type;
-  if (buffer instanceof ArrayBuffer) {
-    type = "ArrayBuffer";
-    view = new DataView(buffer);
-  }
-  else if (buffer instanceof DataView) {
-    type = "DataView";
-    view = buffer;
-  }
-  if (!view) return JSON.stringify(buffer);
-  var bytes = [];
-  for (var i = 0; i < buffer.byteLength; i++) {
-    if (i > 20) {
-      bytes.push("...");
-      break;
-    }
-    var byte = view.getUint8(i).toString(16);
-    if (byte.length === 1) byte = "0" + byte;
-    bytes.push(byte);
-  }
-  return "<" + type + " " + bytes.join(" ") + ">";
-}
-
 // Encode string as utf8 into dataview at offset
 exports.utf8Write = utf8Write;
 function utf8Write(view, offset, string) {
@@ -148,7 +121,7 @@ exports.encode = function (value) {
   var buffer = new ArrayBuffer(encodedSize(value));
   var view = new DataView(buffer);
   encode(value, view, 0);
-  return buffer;
+  return new Uint8Array(buffer);
 };
 
 exports.decode = decode;
@@ -169,8 +142,7 @@ Decoder.prototype.map = function (length) {
   return value;
 };
 Decoder.prototype.bin = function (length) {
-  var value = new ArrayBuffer(length);
-  (new Uint8Array(value)).set(new Uint8Array(this.view.buffer, this.offset, length), 0);
+  var value = new Uint8Array(this.view.buffer, this.offset, length)
   this.offset += length;
   return value;
 };
@@ -344,11 +316,20 @@ Decoder.prototype.parse = function () {
   throw new Error("Unknown type 0x" + type.toString(16));
 };
 function decode(buffer) {
-  var view = new DataView(buffer);
+  var view;
+  if ( buffer instanceof Uint8Array )
+    view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength)
+  else
+    view = new DataView(buffer);
   var decoder = new Decoder(view);
   var value = decoder.parse();
-  if (decoder.offset !== buffer.byteLength) throw new Error((buffer.byteLength - decoder.offset) + " trailing bytes");
+  if (decoder.offset !== buffer.byteLength)
+    throw new Error((buffer.byteLength - decoder.offset) + " trailing bytes");
   return value;
+}
+
+function isBinary(value) {
+  return (value instanceof ArrayBuffer) || (value instanceof Uint8Array);
 }
 
 function encode(value, view, offset) {
@@ -386,7 +367,7 @@ function encode(value, view, offset) {
     }
   }
 
-  if (value instanceof ArrayBuffer) {
+  if (isBinary(value)) {
     var length = value.byteLength;
     // bin 8
     if (length < 0x100) {
@@ -559,7 +540,7 @@ function encodedSize(value) {
     }
   }
 
-  if (value instanceof ArrayBuffer) {
+  if (isBinary(value)) {
     var length = value.byteLength;
     if (length < 0x100) {
       return 2 + length;
