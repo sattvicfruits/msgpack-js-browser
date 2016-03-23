@@ -142,7 +142,8 @@ Decoder.prototype.map = function (length) {
   return value;
 };
 Decoder.prototype.bin = function (length) {
-  var value = new Uint8Array(this.view.buffer, this.offset, length)
+  var value = new Uint8Array(new ArrayBuffer(length));
+  value.set(new Uint8Array(this.view.buffer, this.offset, length), 0);
   this.offset += length;
   return value;
 };
